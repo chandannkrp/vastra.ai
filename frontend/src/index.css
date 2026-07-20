@@ -1,6 +1,76 @@
 @import "tailwindcss";
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=Inter:wght@400..700&display=swap");
+
+/* ------------------------------------------------------------------ *
+ * vastra.ai brand system
+ * Warm cream canvas · deep indigo (natural-dye heritage) · saffron accent
+ * ------------------------------------------------------------------ */
+@theme {
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  /* Canvas */
+  --color-cream: #faf6ee;
+  --color-cream-deep: #f3ecdf;
+  --color-ink: #1c1633;
+  --color-ink-soft: #4a4360;
+
+  /* Brand indigo scale */
+  --color-indigo-50: #eeecfb;
+  --color-indigo-100: #dcd7f6;
+  --color-indigo-200: #bcb0ee;
+  --color-indigo-300: #9b87e3;
+  --color-indigo-400: #7a5fd6;
+  --color-indigo-500: #5f43c4;
+  --color-indigo-600: #4c34a6;
+  --color-indigo-700: #3d2986;
+  --color-indigo-800: #2f2069;
+  --color-indigo-900: #241850;
+
+  /* Saffron / marigold accent */
+  --color-saffron-300: #ffd27a;
+  --color-saffron-400: #fbb748;
+  --color-saffron-500: #f59e0b;
+  --color-saffron-600: #d97e06;
+
+  /* Terracotta secondary */
+  --color-terracotta: #d9694a;
+}
 
 :root {
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-  color-scheme: light dark;
+  color-scheme: light;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-cream);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Subtle weave dot texture behind hero sections */
+.weave-bg {
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    rgba(95, 67, 196, 0.07) 1px,
+    transparent 0
+  );
+  background-size: 22px 22px;
+}
+
+.gradient-text {
+  background: linear-gradient(
+    120deg,
+    var(--color-indigo-600),
+    var(--color-terracotta) 55%,
+    var(--color-saffron-500)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }

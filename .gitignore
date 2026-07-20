@@ -1,13 +1,19 @@
 # Python
 backend/.venv/
+ai-service/.venv/
 __pycache__/
 *.pyc
+*.egg-info/
 backend/vastra.db
 backend/storage/
+ai-service/storage/
 
 # Node
 frontend/node_modules/
 frontend/dist/
+
+# Logs
+*.log
 
 # Env / secrets
 .env

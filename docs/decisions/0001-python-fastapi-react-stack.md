@@ -25,20 +25,21 @@ with `uv`.
 
 ## Rationale
 
-- The core of the product is agents and image handling; Python's LLM/image
-  ecosystem (Anthropic SDK, google-genai, Pillow) is the natural home for that.
+- The core of the product is agents and image handling; Python's agent/LLM
+  ecosystem (LangGraph + LangChain for orchestration, Anthropic and OpenAI SDKs,
+  Pillow) is the natural home for that.
 - FastAPI gives typed request/response models (Pydantic) that pair well with the
   structured-output extraction the pipeline depends on.
 - A dedicated React frontend is worth the second language for a seller-facing and
   review UI that needs to feel professional (side-by-side image review, etc.).
 - Shopify has no official Python SDK we depend on, but its Admin **GraphQL** API
-  is a plain HTTP endpoint — an `httpx` client is sufficient (see ADR-0006), so
-  the lack of a first-class Python SDK is not blocking.
+  is a plain HTTP endpoint — an `httpx` client is sufficient, so the lack of a
+  first-class Python SDK is not blocking.
 
 ## Consequences
 
 - Two languages/toolchains to maintain (`uv` + `npm`). Acceptable for the value.
-- Image-generation/editing is **not** done in Python directly — it is delegated to
-  an external API (see ADR-0003), so Python's ML libraries are used for glue and
-  light processing, not heavy inference.
-- Backend and frontend deploy separately (see ARCHITECTURE §7).
+- Image generation is **not** done in Python directly — it is delegated to an
+  external API (OpenAI `gpt-image-1`); Python handles orchestration (LangGraph),
+  glue, and light processing, not heavy inference.
+- Backend and frontend deploy separately (see ARCHITECTURE §9).

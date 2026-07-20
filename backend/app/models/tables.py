@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, DateTime, Enum, Float, ForeignKey, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -16,25 +16,37 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+# --- Status/stage value constants (stored as plain strings for easy evolution) ---
+
+
 class SubmissionStatus(str, enum.Enum):
     pending = "pending"
     processing = "processing"
     awaiting_review = "awaiting_review"
-    approved = "approved"
     published = "published"
     failed = "failed"
     rejected = "rejected"
 
 
 class PipelineStage(str, enum.Enum):
+    queued = "queued"
     extracting = "extracting"
     enhancing = "enhancing"
-    qc = "qc"
     drafting = "drafting"
-    awaiting_review = "awaiting_review"
+    marketing = "marketing"
     publishing = "publishing"
     published = "published"
     failed = "failed"
+
+
+# Ordered stages the pipeline advances through (for UI progress rendering).
+PIPELINE_STAGES: list[str] = [
+    PipelineStage.extracting.value,
+    PipelineStage.enhancing.value,
+    PipelineStage.drafting.value,
+    PipelineStage.marketing.value,
+    PipelineStage.publishing.value,
+]
 
 
 class ImageKind(str, enum.Enum):
@@ -50,7 +62,7 @@ class Seller(Base):
     name: Mapped[str] = mapped_column(String(255))
     phone: Mapped[str | None] = mapped_column(String(20))
     password_hash: Mapped[str] = mapped_column(String(255))
-    is_admin: Mapped[bool] = mapped_column(default=False)
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     submissions: Mapped[list["Submission"]] = relationship(back_populates="seller")
@@ -63,10 +75,10 @@ class Submission(Base):
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
     seller_id: Mapped[str] = mapped_column(ForeignKey("sellers.id"), index=True)
-    status: Mapped[SubmissionStatus] = mapped_column(
-        Enum(SubmissionStatus), default=SubmissionStatus.pending, index=True
-    )
+    status: Mapped[str] = mapped_column(String(30), default=SubmissionStatus.pending.value, index=True)
+
     # Seller-provided fields — all optional; agents fill the gaps
+    title: Mapped[str | None] = mapped_column(String(255))
     fabric_type: Mapped[str | None] = mapped_column(String(120))
     color: Mapped[str | None] = mapped_column(String(120))
     price_per_meter: Mapped[float | None] = mapped_column(Float)
@@ -74,7 +86,13 @@ class Submission(Base):
     gsm: Mapped[float | None] = mapped_column(Float)
     moq_meters: Mapped[float | None] = mapped_column(Float)
     notes: Mapped[str | None] = mapped_column(Text)
-    source_channel: Mapped[str] = mapped_column(String(20), default="webapp")  # webapp | whatsapp
+
+    # Customization choices that steer the agents:
+    # {"image_shots": ["flatlay","draped",...], "tone": "editorial",
+    #  "audience": "designers", "length": "standard"}
+    customization: Mapped[dict | None] = mapped_column(JSON)
+
+    source_channel: Mapped[str] = mapped_column(String(20), default="webapp")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
 
@@ -89,13 +107,12 @@ class Image(Base):
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
     submission_id: Mapped[str] = mapped_column(ForeignKey("submissions.id"), index=True)
-    kind: Mapped[ImageKind] = mapped_column(Enum(ImageKind), default=ImageKind.raw)
-    # For enhanced images, the raw image it was derived from
+    kind: Mapped[str] = mapped_column(String(20), default=ImageKind.raw.value)
     parent_image_id: Mapped[str | None] = mapped_column(ForeignKey("images.id"))
     storage_key: Mapped[str] = mapped_column(String(500))
-    content_type: Mapped[str] = mapped_column(String(100), default="image/jpeg")
-    approved: Mapped[bool | None] = mapped_column(default=None)  # reviewer decision
-    qc_result: Mapped[dict | None] = mapped_column(JSON)  # QC agent verdict
+    content_type: Mapped[str] = mapped_column(String(100), default="image/png")
+    shot_type: Mapped[str | None] = mapped_column(String(40))  # flatlay | draped | macro | on_model
+    approved: Mapped[bool | None] = mapped_column(Boolean, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     submission: Mapped[Submission] = relationship(back_populates="images")
@@ -108,10 +125,9 @@ class Product(Base):
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
     submission_id: Mapped[str] = mapped_column(ForeignKey("submissions.id"), unique=True)
-    # Extraction agent output (structured attributes + per-field confidence)
-    attributes: Mapped[dict | None] = mapped_column(JSON)
-    # Listing agent output (title, description_html, tags, product_type, metafields, variants)
-    listing: Mapped[dict | None] = mapped_column(JSON)
+    attributes: Mapped[dict | None] = mapped_column(JSON)  # extraction agent output
+    listing: Mapped[dict | None] = mapped_column(JSON)  # listing agent output
+    marketing: Mapped[dict | None] = mapped_column(JSON)  # marketing/lookbook agent output
     shopify_product_gid: Mapped[str | None] = mapped_column(String(100), index=True)
     shopify_status: Mapped[str | None] = mapped_column(String(20))  # DRAFT | ACTIVE
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
@@ -127,12 +143,12 @@ class PipelineRun(Base):
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
     submission_id: Mapped[str] = mapped_column(ForeignKey("submissions.id"), index=True)
-    stage: Mapped[PipelineStage] = mapped_column(Enum(PipelineStage), default=PipelineStage.extracting)
-    # Per-stage logs: [{stage, started_at, finished_at, ok, detail, usage}]
+    stage: Mapped[str] = mapped_column(String(30), default=PipelineStage.queued.value)
+    # Per-stage logs: [{stage, status, detail, at}]
     stage_log: Mapped[list | None] = mapped_column(JSON, default=list)
     error: Mapped[str | None] = mapped_column(Text)
-    total_input_tokens: Mapped[int] = mapped_column(default=0)
-    total_output_tokens: Mapped[int] = mapped_column(default=0)
+    total_input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    total_output_tokens: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
 

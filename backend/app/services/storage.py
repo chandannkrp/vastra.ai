@@ -18,7 +18,7 @@ class LocalStorage:
             raise ValueError(f"Invalid storage key: {key}")
         return path
 
-    def save(self, key: str, data: bytes) -> str:
+    def save(self, key: str, data: bytes, content_type: str = "application/octet-stream") -> str:
         path = self._path(key)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(data)
@@ -37,19 +37,24 @@ class LocalStorage:
 
 
 class S3Storage:
+    """AWS S3 (or any S3-compatible store via a custom endpoint, e.g. R2)."""
+
     def __init__(self):
         import boto3
 
-        self.bucket = settings.s3_bucket
+        self.bucket = settings.aws_bucket_name
+        if not self.bucket:
+            raise RuntimeError("AWS_BUCKET_NAME not configured")
         self.client = boto3.client(
             "s3",
-            endpoint_url=settings.s3_endpoint_url,
-            aws_access_key_id=settings.s3_access_key_id,
-            aws_secret_access_key=settings.s3_secret_access_key,
+            region_name=settings.aws_region or None,
+            endpoint_url=settings.s3_endpoint_url or None,  # None => real AWS
+            aws_access_key_id=settings.aws_access_key_id or None,
+            aws_secret_access_key=settings.aws_secret_access_key or None,
         )
 
-    def save(self, key: str, data: bytes) -> str:
-        self.client.put_object(Bucket=self.bucket, Key=key, Body=data)
+    def save(self, key: str, data: bytes, content_type: str = "application/octet-stream") -> str:
+        self.client.put_object(Bucket=self.bucket, Key=key, Body=data, ContentType=content_type)
         return key
 
     def load(self, key: str) -> bytes:

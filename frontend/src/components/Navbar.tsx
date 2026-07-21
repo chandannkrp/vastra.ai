@@ -3,6 +3,7 @@ import { LayoutDashboard, LogOut } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { Logo } from "./Logo";
+import { TokenBalance } from "./TokenBalance";
 
 export function Navbar() {
   const { user, role, logout } = useAuth();
@@ -27,6 +28,7 @@ export function Navbar() {
         <nav className="flex items-center gap-2 sm:gap-3">
           {user ? (
             <>
+              {role === "seller" && <TokenBalance />}
               <Link
                 to={dashboardPath}
                 className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-ink-soft transition hover:text-indigo-700"

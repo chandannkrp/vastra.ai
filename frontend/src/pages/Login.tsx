@@ -1,8 +1,8 @@
 import { AxiosError } from "axios";
-import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthShell, Divider, Field } from "../components/AuthShell";
+import { BrandLoader } from "../components/BrandLoader";
 import { GoogleButton } from "../components/GoogleButton";
 import { useAuth } from "../lib/auth";
 
@@ -41,7 +41,7 @@ export default function Login() {
   }
 
   return (
-    <AuthShell title="Welcome back" subtitle="Log in to your vastra.ai workspace.">
+    <AuthShell title="Welcome back" subtitle="Log in to your vastraas.ai workspace.">
       <form onSubmit={handleSubmit} className="space-y-5">
         <Field
           label="Email"
@@ -73,7 +73,7 @@ export default function Login() {
           disabled={loading}
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-700 px-5 py-3.5 font-semibold text-cream shadow-lg shadow-indigo-700/20 transition hover:bg-indigo-800 disabled:opacity-60"
         >
-          {loading && <Loader2 size={18} className="animate-spin" />}
+          {loading && <BrandLoader size={18} />}
           {loading ? "Logging in…" : "Log in"}
         </button>
       </form>
@@ -82,7 +82,7 @@ export default function Login() {
       <GoogleButton onCredential={handleGoogle} />
 
       <p className="mt-6 text-center text-sm text-ink-soft">
-        New to vastra.ai?{" "}
+        New to vastraas.ai?{" "}
         <Link to="/register" className="font-semibold text-indigo-700 hover:underline">
           Create an account
         </Link>

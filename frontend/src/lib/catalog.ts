@@ -17,6 +17,7 @@ export interface PipelineProgress {
   failed: boolean;
   error: string | null;
   tokens: number;
+  elapsed_seconds?: number | null;
 }
 
 export interface SubmissionListItem {
@@ -87,6 +88,11 @@ export interface Customization {
   tone: string;
   audience: string;
   length: string;
+  finish?: string;
+  dye?: string;
+  texture?: string;
+  pattern?: string;
+  custom_prompt?: string;
 }
 
 // --- API calls ---------------------------------------------------------
@@ -136,6 +142,22 @@ export async function getAnalytics(): Promise<AnalyticsSummary> {
 export async function getShopifyStatus(): Promise<ConnectorStatus> {
   const { data } = await api.get("/connectors/shopify");
   return data;
+}
+
+export interface ShopifyConnectInput {
+  store_domain: string;
+  admin_token?: string;
+  client_id?: string;
+  client_secret?: string;
+}
+
+export async function connectShopify(input: ShopifyConnectInput): Promise<ConnectorStatus> {
+  const { data } = await api.post("/connectors/shopify", input);
+  return data;
+}
+
+export async function disconnectShopify(): Promise<void> {
+  await api.delete("/connectors/shopify");
 }
 
 // --- Tokens ------------------------------------------------------------
@@ -214,4 +236,130 @@ export async function getBusinessDetail(id: string): Promise<BusinessDetail> {
 export async function getGrowth(): Promise<GrowthMetrics> {
   const { data } = await api.get("/admin/growth");
   return data;
+}
+
+// --- Billing / packs ---------------------------------------------------
+
+export interface TokenPack {
+  id: string;
+  label: string;
+  tokens: number;
+  amount: number; // paise
+  approx_products: number;
+  popular?: boolean;
+}
+
+export interface PacksResponse {
+  packs: TokenPack[];
+  currency: string;
+  stripe: boolean;
+}
+
+export async function getPacks(): Promise<PacksResponse> {
+  const { data } = await api.get("/billing/packs");
+  return data;
+}
+
+export async function checkout(packId: string): Promise<{ mock?: boolean; url?: string; credited?: number }> {
+  const { data } = await api.post("/billing/checkout", { pack_id: packId });
+  return data;
+}
+
+export async function verifyCheckout(sessionId: string): Promise<{ ok: boolean; credited?: number }> {
+  const { data } = await api.post("/billing/verify", { session_id: sessionId });
+  return data;
+}
+
+// --- Product edit / images --------------------------------------------
+
+export async function updateListing(
+  submissionId: string,
+  payload: { title?: string; description_html?: string; tags?: string[] },
+): Promise<SubmissionDetail> {
+  const { data } = await api.patch(`/submissions/${submissionId}/listing`, payload);
+  return data;
+}
+
+export async function regenerateImage(
+  submissionId: string,
+  body: { shot_type: string; prompt?: string },
+): Promise<ImageOut> {
+  const { data } = await api.post(`/submissions/${submissionId}/regenerate-image`, body);
+  return data;
+}
+
+export async function deleteImage(imageId: string): Promise<void> {
+  await api.delete(`/images/${imageId}`);
+}
+
+export async function selectImage(imageId: string, approved: boolean): Promise<void> {
+  await api.post(`/images/${imageId}/select`, { approved });
+}
+
+export interface ShopifyCollection {
+  id: string;
+  title: string;
+}
+
+export async function getShopifyCollections(): Promise<ShopifyCollection[]> {
+  const { data } = await api.get("/connectors/shopify/collections");
+  return data.collections ?? [];
+}
+
+export interface PublishPayload {
+  title?: string;
+  description_html?: string;
+  product_type?: string;
+  vendor?: string;
+  tags?: string[];
+  status?: "DRAFT" | "ACTIVE";
+  price?: number;
+  compare_at_price?: number;
+  image_ids?: string[];
+  collection_ids?: string[];
+  set_contents?: string;
+  care?: string;
+  gsm?: string;
+  width?: string;
+  composition?: string;
+}
+
+export async function publishToShopify(
+  submissionId: string,
+  payload: PublishPayload,
+): Promise<{ gid: string; admin_url: string; online_url?: string; status: string }> {
+  const { data } = await api.post(`/submissions/${submissionId}/publish`, payload);
+  return data;
+}
+
+export interface SetPublishPayload {
+  submission_ids: string[];
+  title?: string;
+  description_html?: string;
+  product_type?: string;
+  status?: "DRAFT" | "ACTIVE";
+  price?: number;
+  compare_at_price?: number;
+  tags?: string[];
+  collection_ids?: string[];
+  set_contents?: string;
+  care?: string;
+  composition?: string;
+}
+
+export async function publishSetToShopify(
+  payload: SetPublishPayload,
+): Promise<{ gid: string; admin_url: string; online_url?: string; status: string; submission_ids: string[] }> {
+  const { data } = await api.post(`/submissions/publish-set`, payload);
+  return data;
+}
+
+export async function downloadImagesZip(submissionId: string, filename: string): Promise<void> {
+  const res = await api.get(`/submissions/${submissionId}/images.zip`, { responseType: "blob" });
+  const url = URL.createObjectURL(res.data as Blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }

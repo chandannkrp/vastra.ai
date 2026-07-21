@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useAuth } from "./auth";
 
 export interface TrackedRun {
   id: string;
@@ -40,10 +41,21 @@ export function PipelineDockProvider({ children }: { children: ReactNode }) {
     }
   });
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const { user } = useAuth();
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(tracked));
   }, [tracked]);
+
+  // Signing out (or never having signed in) means there is no seller session
+  // to poll progress for — drop anything tracked so the dock and its
+  // animation can't linger on public pages or after logout.
+  useEffect(() => {
+    if (!user) {
+      setTracked([]);
+      setToasts([]);
+    }
+  }, [user]);
 
   const track = useCallback((id: string, title: string) => {
     setTracked((prev) => (prev.some((t) => t.id === id) ? prev : [{ id, title }, ...prev]));

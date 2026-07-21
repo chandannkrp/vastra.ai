@@ -1,10 +1,20 @@
 import { motion } from "framer-motion";
-import { Loader2, Tag } from "lucide-react";
+import { Clock, Tag } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { assetUrl } from "../lib/api";
-import { getSubmission, type SubmissionDetail } from "../lib/catalog";
+import { getSubmission, type ImageOut, type SubmissionDetail } from "../lib/catalog";
+import { BrandLoaderRow } from "./BrandLoader";
+import { GeneratingGallery } from "./GeneratingGallery";
+import { ImageFeed } from "./ImageFeed";
 import { PipelineFlow } from "./PipelineFlow";
 import { StatusBadge } from "./StatusBadge";
+
+function fmtDuration(s?: number | null): string | null {
+  if (s == null) return null;
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return r ? `${m}m ${r}s` : `${m}m`;
+}
 
 /** Polls a submission until the pipeline finishes, rendering live progress + results. */
 export function SubmissionProgress({ id }: { id: string }) {
@@ -33,16 +43,19 @@ export function SubmissionProgress({ id }: { id: string }) {
   }, [id]);
 
   if (!detail) {
-    return (
-      <div className="flex items-center gap-2 text-ink-soft">
-        <Loader2 className="animate-spin" size={18} /> Starting the pipeline…
-      </div>
-    );
+    return <BrandLoaderRow label="Starting the pipeline…" />;
   }
+
+  const isGeneratingImages = detail.progress.stages.some(
+    (s) => s.key === "enhancing" && s.status === "running",
+  );
+  const requestedShots =
+    ((detail.customization as { image_shots?: string[] } | null)?.image_shots) ?? [];
 
   return (
     <div className="space-y-6">
       <PipelineFlow progress={detail.progress} />
+      {isGeneratingImages && <GeneratingGallery shots={requestedShots} />}
       {detail.progress.done && <ResultView detail={detail} />}
     </div>
   );
@@ -51,33 +64,28 @@ export function SubmissionProgress({ id }: { id: string }) {
 function ResultView({ detail }: { detail: SubmissionDetail }) {
   const listing = (detail.listing ?? {}) as Record<string, string | string[]>;
   const marketing = (detail.marketing ?? {}) as Record<string, string | string[]>;
-  const generated = detail.images.filter((i) => i.kind === "enhanced");
+  const [images, setImages] = useState<ImageOut[]>(detail.images);
+  const took = fmtDuration(detail.progress.elapsed_seconds);
+  const enhancedCount = images.filter((i) => i.kind === "enhanced").length;
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="grid gap-6 lg:grid-cols-[1fr_1fr]"
+      className="space-y-4"
     >
-      {/* Generated imagery */}
-      <div className="rounded-3xl border border-black/5 bg-white p-6 shadow-sm">
-        <h4 className="mb-4 font-semibold text-ink">Generated imagery</h4>
-        <div className="grid grid-cols-2 gap-3">
-          {generated.map((img) => (
-            <div key={img.id} className="overflow-hidden rounded-xl bg-cream-deep">
-              <img
-                src={assetUrl(img.url)}
-                alt={img.shot_type ?? "generated"}
-                className="aspect-square w-full object-cover"
-              />
-              <p className="px-3 py-2 text-xs font-medium capitalize text-ink-soft">
-                {img.shot_type?.replace("_", " ")}
-              </p>
-            </div>
-          ))}
-        </div>
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+        <span className="font-medium text-emerald-800">✨ {enhancedCount} studio shots ready</span>
+        {took && (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1 text-sm font-medium text-emerald-700">
+            <Clock size={14} /> Generated in {took}
+          </span>
+        )}
       </div>
+
+      <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
+      <ImageFeed submissionId={detail.submission.id} images={images} onImagesChange={setImages} />
 
       {/* Listing + marketing */}
       <div className="space-y-6">
@@ -115,6 +123,7 @@ function ResultView({ detail }: { detail: SubmissionDetail }) {
               {(marketing.hashtags as string[]).join(" ")}
             </p>
           )}
+        </div>
         </div>
       </div>
     </motion.div>

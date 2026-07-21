@@ -2,7 +2,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
   Check,
-  Loader2,
   Megaphone,
   ScanSearch,
   Sparkles,
@@ -11,6 +10,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { PipelineProgress, StageStatus } from "../lib/catalog";
+import { BrandLoader } from "./BrandLoader";
 
 const ICONS: Record<string, LucideIcon> = {
   extracting: ScanSearch,
@@ -71,44 +71,53 @@ export function PipelineFlow({ progress }: { progress: PipelineProgress }) {
       <div className="flex items-start gap-1 overflow-x-auto pb-2">
         {stages.map((stage, i) => {
           const Icon = ICONS[stage.key] ?? Sparkles;
+          const prevDone = stages[i - 1]?.status === "done";
           return (
             <div key={stage.key} className="flex min-w-0 flex-1 flex-col items-center">
               <div className="flex w-full items-center">
-                <Connector active={stages[i - 1]?.status === "done"} hidden={i === 0} />
-                <motion.div
-                  className={`relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border-2 ${nodeClasses(stage.status)}`}
-                  animate={
-                    stage.status === "running"
-                      ? { scale: [1, 1.08, 1], boxShadow: "0 0 0 6px rgba(95,67,196,0.12)" }
-                      : { scale: 1 }
-                  }
-                  transition={{ duration: 1.2, repeat: stage.status === "running" ? Infinity : 0 }}
-                >
-                  <AnimatePresence mode="wait">
-                    {stage.status === "done" ? (
-                      <motion.span
-                        key="done"
-                        initial={{ scale: 0, rotate: -30 }}
-                        animate={{ scale: 1, rotate: 0 }}
-                      >
-                        <Check size={22} strokeWidth={3} />
-                      </motion.span>
-                    ) : stage.status === "running" ? (
-                      <motion.span key="run">
-                        <Loader2 size={22} className="animate-spin" />
-                      </motion.span>
-                    ) : stage.status === "failed" ? (
-                      <AlertTriangle size={22} />
-                    ) : (
-                      <Icon size={22} />
-                    )}
-                  </AnimatePresence>
-                </motion.div>
-                <Connector active={stage.status === "done"} hidden={i === stages.length - 1} />
+                <Connector active={prevDone} live={stage.status === "running"} hidden={i === 0} />
+                <div className="relative">
+                  {/* Orbiting glow while running */}
+                  {stage.status === "running" && (
+                    <motion.span
+                      className="absolute -inset-2 rounded-full bg-indigo-500/15 blur-md"
+                      animate={{ scale: [1, 1.25, 1], opacity: [0.5, 0.9, 0.5] }}
+                      transition={{ duration: 1.6, repeat: Infinity }}
+                    />
+                  )}
+                  <motion.div
+                    className={`relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border-2 ${nodeClasses(stage.status)}`}
+                    animate={
+                      stage.status === "running"
+                        ? { y: [0, -3, 0], boxShadow: "0 0 0 6px rgba(95,67,196,0.14)" }
+                        : { y: 0 }
+                    }
+                    transition={{ duration: 1.4, repeat: stage.status === "running" ? Infinity : 0, ease: "easeInOut" }}
+                  >
+                    <AnimatePresence mode="wait">
+                      {stage.status === "done" ? (
+                        <motion.span key="done" initial={{ scale: 0, rotate: -30 }} animate={{ scale: 1, rotate: 0 }}>
+                          <Check size={22} strokeWidth={3} />
+                        </motion.span>
+                      ) : stage.status === "running" ? (
+                        <motion.span key="run">
+                          <BrandLoader size={22} />
+                        </motion.span>
+                      ) : stage.status === "failed" ? (
+                        <AlertTriangle size={22} />
+                      ) : (
+                        <Icon size={22} />
+                      )}
+                    </AnimatePresence>
+                  </motion.div>
+                </div>
+                <Connector active={stage.status === "done"} live={stages[i + 1]?.status === "running"} hidden={i === stages.length - 1} />
               </div>
-              <p className="mt-3 text-center text-xs font-semibold text-ink">{stage.label}</p>
+              <p className={`mt-3 text-center text-xs font-semibold ${stage.status === "running" ? "text-indigo-700" : "text-ink"}`}>
+                {stage.label}
+              </p>
               <p className="mt-1 line-clamp-2 h-8 text-center text-[11px] leading-tight text-ink-soft">
-                {stage.detail}
+                {stage.detail || (stage.status === "running" ? "working…" : "")}
               </p>
             </div>
           );
@@ -124,7 +133,7 @@ export function PipelineFlow({ progress }: { progress: PipelineProgress }) {
   );
 }
 
-function Connector({ active, hidden }: { active: boolean; hidden: boolean }) {
+function Connector({ active, live = false, hidden }: { active: boolean; live?: boolean; hidden: boolean }) {
   if (hidden) return <div className="h-0.5 flex-1" />;
   return (
     <div className="relative h-0.5 flex-1 overflow-hidden rounded-full bg-black/10">
@@ -135,6 +144,14 @@ function Connector({ active, hidden }: { active: boolean; hidden: boolean }) {
         style={{ transformOrigin: "left" }}
         transition={{ duration: 0.5 }}
       />
+      {/* Travelling data pulse into the currently-running node */}
+      {live && (
+        <motion.div
+          className="absolute top-0 h-full w-1/3 rounded-full bg-gradient-to-r from-transparent via-indigo-500 to-transparent"
+          animate={{ x: ["-40%", "260%"] }}
+          transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut" }}
+        />
+      )}
     </div>
   );
 }

@@ -35,7 +35,7 @@ export function Logo({ to = "/" }: { to?: string }) {
     <Link to={to} className="flex items-center gap-2.5">
       <LogoMark size={34} />
       <span className="font-display text-2xl font-semibold tracking-tight text-ink">
-        vastra
+        vastraas
         <span className="text-saffron-500">.ai</span>
       </span>
     </Link>

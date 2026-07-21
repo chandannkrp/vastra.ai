@@ -69,6 +69,24 @@ class Seller(Base):
     submissions: Mapped[list["Submission"]] = relationship(back_populates="seller")
 
 
+class ShopifyConnection(Base):
+    """A seller's own Shopify store credentials, so each seller publishes to
+    their own store. One connection per seller."""
+
+    __tablename__ = "shopify_connections"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    seller_id: Mapped[str] = mapped_column(ForeignKey("sellers.id"), unique=True, index=True)
+    store_domain: Mapped[str] = mapped_column(String(255))
+    # One of: a static Admin API token, OR a client id + secret (client-credentials grant).
+    admin_token: Mapped[str | None] = mapped_column(String(255))
+    client_id: Mapped[str | None] = mapped_column(String(255))
+    client_secret: Mapped[str | None] = mapped_column(String(255))
+    shop_name: Mapped[str | None] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
+
+
 class Submission(Base):
     """Raw intake from a seller: images + whatever info they provided."""
 
@@ -135,6 +153,23 @@ class Product(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
 
     submission: Mapped[Submission] = relationship(back_populates="product")
+
+
+class TokenPurchase(Base):
+    """A token top-up (Stripe or mock). Keyed by Stripe session id for idempotency."""
+
+    __tablename__ = "token_purchases"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    seller_id: Mapped[str] = mapped_column(ForeignKey("sellers.id"), index=True)
+    pack_id: Mapped[str] = mapped_column(String(40))
+    tokens: Mapped[int] = mapped_column(Integer)
+    amount: Mapped[int] = mapped_column(Integer)  # smallest currency unit (paise)
+    currency: Mapped[str] = mapped_column(String(8), default="inr")
+    provider: Mapped[str] = mapped_column(String(20), default="stripe")  # stripe | mock
+    stripe_session_id: Mapped[str | None] = mapped_column(String(255), unique=True, index=True)
+    status: Mapped[str] = mapped_column(String(20), default="pending")  # pending | paid | failed
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
 class PipelineRun(Base):

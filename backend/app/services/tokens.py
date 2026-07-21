@@ -29,22 +29,42 @@ def tokens_used_for_seller(db: Session, seller_id: str) -> int:
 
 
 def daily_usage_for_seller(db: Session, seller_id: str, days: int = 14) -> list[dict]:
-    """Per-day token usage for the last `days` days (zero-filled)."""
+    """Per-day token usage for the last `days` days (zero-filled).
+
+    Day-bucketing is done in Python rather than via the DB's ``date()`` function.
+    ``PipelineRun.created_at`` is stored tz-aware in UTC, and grouping on
+    ``func.date()`` produced key strings that didn't line up with the
+    Python-generated date keys below — so every day zero-filled and the chart
+    came back empty. Bucketing here is immune to that serialisation mismatch and
+    behaves identically on SQLite and Postgres.
+    """
+    base = datetime.now(timezone.utc).date()
     since = datetime.now(timezone.utc) - timedelta(days=days - 1)
+    by_day: dict[str, int] = {}
+
     sub_ids = db.scalars(select(Submission.id).where(Submission.seller_id == seller_id)).all()
-    rows = []
     if sub_ids:
-        day = func.date(PipelineRun.created_at)
         rows = db.execute(
-            select(day.label("d"), _run_tokens_col().label("t"))
-            .where(PipelineRun.submission_id.in_(sub_ids), PipelineRun.created_at >= since)
-            .group_by(day)
+            select(
+                PipelineRun.created_at,
+                PipelineRun.total_input_tokens,
+                PipelineRun.total_output_tokens,
+            ).where(
+                PipelineRun.submission_id.in_(sub_ids),
+                PipelineRun.created_at >= since,
+            )
         ).all()
-    by_day = {str(r.d): int(r.t or 0) for r in rows}
+        for created_at, tin, tout in rows:
+            if created_at is None:
+                continue
+            # Normalise any naive timestamps to UTC so the bucket key matches `base`.
+            if created_at.tzinfo is None:
+                created_at = created_at.replace(tzinfo=timezone.utc)
+            key = created_at.astimezone(timezone.utc).date().isoformat()
+            by_day[key] = by_day.get(key, 0) + int(tin or 0) + int(tout or 0)
 
     out = []
-    base = datetime.now(timezone.utc).date()
     for i in range(days - 1, -1, -1):
-        d = str(base - timedelta(days=i))
+        d = (base - timedelta(days=i)).isoformat()
         out.append({"date": d, "tokens": by_day.get(d, 0)})
     return out

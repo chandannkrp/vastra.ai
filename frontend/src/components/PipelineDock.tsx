@@ -3,13 +3,13 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
-  Loader2,
   Sparkles,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { getSubmission, type PipelineProgress } from "../lib/catalog";
 import { usePipelineDock, type TrackedRun } from "../lib/pipelineDock";
+import { BrandLoader } from "./BrandLoader";
 
 export function PipelineDock() {
   const { tracked, toasts, dismissToast } = usePipelineDock();
@@ -90,6 +90,7 @@ function DockRunCard({ run }: { run: TrackedRun }) {
   const [title, setTitle] = useState(run.title);
   const timer = useRef<number>(undefined);
   const notified = useRef(false);
+  const failures = useRef(0);
 
   useEffect(() => {
     let stopped = false;
@@ -97,6 +98,7 @@ function DockRunCard({ run }: { run: TrackedRun }) {
       try {
         const d = await getSubmission(run.id);
         if (stopped) return;
+        failures.current = 0;
         setProgress(d.progress);
         const t = (d.listing?.title as string) || d.submission.title || run.title;
         setTitle(t);
@@ -110,9 +112,28 @@ function DockRunCard({ run }: { run: TrackedRun }) {
         }
         if (!d.progress.done && !d.progress.failed) {
           timer.current = window.setTimeout(tick, 2500);
+        } else {
+          // Terminal state: auto-clear so a finished run can't linger in the
+          // dock (or persist in localStorage and re-show the "working" spinner
+          // on the next page load, during otherwise idle time). The success/
+          // failure toast has already surfaced the outcome.
+          timer.current = window.setTimeout(() => untrack(run.id), 6000);
         }
       } catch {
-        if (!stopped) timer.current = window.setTimeout(tick, 4000);
+        if (stopped) return;
+        failures.current += 1;
+        // A run that's unreachable after several tries (deleted, expired
+        // session, network gone) shouldn't spin the "agents working"
+        // animation forever — surface it once and drop it from the dock.
+        if (failures.current >= 5) {
+          if (!notified.current) {
+            notified.current = true;
+            notify(`Couldn't refresh "${run.title}" — removed from the dock.`, "error");
+          }
+          untrack(run.id);
+          return;
+        }
+        timer.current = window.setTimeout(tick, 4000);
       }
     }
     tick();
@@ -137,7 +158,7 @@ function DockRunCard({ run }: { run: TrackedRun }) {
           done ? "bg-emerald-600 text-white" : failed ? "bg-terracotta text-white" : "bg-indigo-50 text-indigo-700"
         }`}
       >
-        {done ? <Check size={18} /> : failed ? <X size={18} /> : <Loader2 size={18} className="animate-spin" />}
+        {done ? <Check size={18} /> : failed ? <X size={18} /> : <BrandLoader size={16} />}
       </div>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-ink">{title}</p>

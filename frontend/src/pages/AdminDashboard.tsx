@@ -26,7 +26,7 @@ export default function AdminDashboard() {
           <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-indigo-700">
             Admin control room
           </span>
-          <h1 className="mt-3 font-display text-4xl font-semibold text-ink">vastra.ai HQ</h1>
+          <h1 className="mt-3 font-display text-4xl font-semibold text-ink">vastraas.ai HQ</h1>
           <p className="mt-1 text-ink-soft">Signed in as {user?.email}</p>
         </div>
 

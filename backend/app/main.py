@@ -7,6 +7,7 @@ from app.api import (
     admin,
     analytics,
     auth,
+    billing,
     connectors,
     images,
     products,
@@ -37,7 +38,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for r in (auth, submissions, images, products, analytics, connectors, tokens, admin):
+for r in (auth, submissions, images, products, analytics, connectors, tokens, admin, billing):
     app.include_router(r.router, prefix="/api")
 
 

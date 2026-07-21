@@ -1,7 +1,8 @@
 import { motion } from "framer-motion";
-import { Building2, CheckCircle2, Coins, Layers, Loader2, TrendingUp } from "lucide-react";
+import { Building2, CheckCircle2, Coins, Layers, TrendingUp } from "lucide-react";
 import { useEffect, useState } from "react";
 import { BarChart } from "../../components/BarChart";
+import { BrandLoaderPanel } from "../../components/BrandLoader";
 import { getGrowth, type GrowthMetrics } from "../../lib/catalog";
 
 export function AdminGrowth() {
@@ -15,11 +16,7 @@ export function AdminGrowth() {
   }, []);
 
   if (loading || !g) {
-    return (
-      <div className="flex items-center gap-2 text-ink-soft">
-        <Loader2 className="animate-spin" size={18} /> Loading growth…
-      </div>
-    );
+    return <BrandLoaderPanel label="Loading growth…" />;
   }
 
   const stats = [

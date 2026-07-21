@@ -31,7 +31,7 @@ export function AuthShell({
           </p>
         </div>
         <div className="relative text-sm text-indigo-300/80">
-          © {new Date().getFullYear()} vastra.ai
+          © {new Date().getFullYear()} vastraas.ai
         </div>
       </div>
 

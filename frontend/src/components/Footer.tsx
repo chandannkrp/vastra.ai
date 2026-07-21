@@ -7,14 +7,14 @@ export function Footer() {
         <div className="flex items-center gap-2.5">
           <LogoMark size={26} />
           <span className="font-display text-lg font-semibold text-ink">
-            vastra<span className="text-saffron-500">.ai</span>
+            vastraas<span className="text-saffron-500">.ai</span>
           </span>
         </div>
         <p className="text-sm text-ink-soft">
           AI storefront for fabric sellers · Built for Indian designers &amp; garmenters
         </p>
         <p className="text-xs text-ink-soft/70">
-          © {new Date().getFullYear()} vastra.ai
+          © {new Date().getFullYear()} vastraas.ai
         </p>
       </div>
     </footer>

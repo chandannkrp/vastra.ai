@@ -84,6 +84,27 @@ def build_progress(run: PipelineRun | None) -> dict:
 
     done_count = sum(1 for s in stages if s["status"] == "done")
     percent = 100 if finished else round(done_count / len(stages) * 100)
+
+    # Total wall-clock time from run start to the last recorded stage event
+    # (or "now" while still running) — surfaced so the UI can show how long the
+    # full product took to generate.
+    elapsed_seconds = None
+    try:
+        start = run.created_at
+        if start is not None:
+            if start.tzinfo is None:
+                start = start.replace(tzinfo=timezone.utc)
+            if finished or run.stage == "failed":
+                ats = [e.get("at") for e in log if e.get("at")]
+                end = datetime.fromisoformat(max(ats)) if ats else datetime.now(timezone.utc)
+            else:
+                end = datetime.now(timezone.utc)
+            if end.tzinfo is None:
+                end = end.replace(tzinfo=timezone.utc)
+            elapsed_seconds = max(0, int((end - start).total_seconds()))
+    except Exception:  # noqa: BLE001
+        elapsed_seconds = None
+
     return {
         "stages": stages,
         "current": run.stage,
@@ -92,4 +113,5 @@ def build_progress(run: PipelineRun | None) -> dict:
         "failed": run.stage == "failed",
         "error": run.error,
         "tokens": (run.total_input_tokens or 0) + (run.total_output_tokens or 0),
+        "elapsed_seconds": elapsed_seconds,
     }

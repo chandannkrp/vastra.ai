@@ -58,7 +58,10 @@ class S3Storage:
         return key
 
     def load(self, key: str) -> bytes:
-        return self.client.get_object(Bucket=self.bucket, Key=key)["Body"].read()
+        try:
+            return self.client.get_object(Bucket=self.bucket, Key=key)["Body"].read()
+        except self.client.exceptions.NoSuchKey:
+            raise FileNotFoundError(key)
 
     def exists(self, key: str) -> bool:
         try:
@@ -69,6 +72,12 @@ class S3Storage:
 
     def delete(self, key: str) -> None:
         self.client.delete_object(Bucket=self.bucket, Key=key)
+
+    def presigned_url(self, key: str, expires: int = 3600) -> str:
+        """Time-limited public GET URL — used so Shopify can fetch the image."""
+        return self.client.generate_presigned_url(
+            "get_object", Params={"Bucket": self.bucket, "Key": key}, ExpiresIn=expires
+        )
 
 
 def get_storage():

@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Loader2, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { BrandLoaderPanel, BrandLoaderRow } from "../../components/BrandLoader";
 import { StatusBadge } from "../../components/StatusBadge";
 import {
   getBusinessDetail,
@@ -21,11 +22,7 @@ export function AdminBusinesses() {
   }, []);
 
   if (loading) {
-    return (
-      <div className="flex items-center gap-2 text-ink-soft">
-        <Loader2 className="animate-spin" size={18} /> Loading businesses…
-      </div>
-    );
+    return <BrandLoaderPanel label="Loading businesses…" />;
   }
 
   return (
@@ -122,9 +119,7 @@ function BusinessDrawer({ id, onClose }: { id: string; onClose: () => void }) {
         className="h-full w-full max-w-md overflow-y-auto bg-cream p-6 shadow-2xl"
       >
         {!detail ? (
-          <div className="flex items-center gap-2 text-ink-soft">
-            <Loader2 className="animate-spin" size={18} /> Loading…
-          </div>
+          <BrandLoaderRow />
         ) : (
           <>
             <div className="mb-6 flex items-start justify-between">

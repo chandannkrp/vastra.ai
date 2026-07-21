@@ -5,7 +5,10 @@ state), does its work, records progress, and returns a partial state update.
 """
 
 import base64
+import io
 import logging
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from sqlalchemy import select
@@ -17,20 +20,12 @@ from app.agents.state import PipelineState
 from app.config import get_settings
 from app.db import SessionLocal
 from app.models.tables import Image, PipelineRun, Product, Submission
-from app.services.openai_images import OpenAIImageService
+from app.services.image_gen import aspect_for, build_prompt, get_image_service
 from app.services.storage import get_storage
 
 logger = logging.getLogger("vastra.agents")
 settings = get_settings()
 storage = get_storage()
-
-SHOT_PROMPTS = {
-    "flatlay": "a clean overhead flat-lay of the fabric neatly laid out",
-    "draped": "the fabric elegantly draped to show its fall and sheen",
-    "macro": "an extreme close-up showing the weave and texture detail",
-    "on_model": "the fabric styled on a model as a simple garment",
-}
-
 
 def _get_run(db, rid: str) -> PipelineRun:
     return db.get(PipelineRun, rid)
@@ -126,13 +121,24 @@ def image_node(state: PipelineState) -> PipelineState:
         sub = db.get(Submission, sid)
         attrs = state.get("attributes", {})
         cust = sub.customization or {}
-        shots = cust.get("image_shots") or ["flatlay", "draped"]
+        # Full-body studio-led defaults (the seller's reference look).
+        shots = cust.get("image_shots") or ["on_model", "draped", "flatlay"]
         shots = shots[: settings.max_images_per_submission]
+        custom_prompt = (cust.get("custom_prompt") or "").strip()
+        finish = cust.get("finish")  # e.g. matte, glossy, sheen
+        dye = cust.get("dye")  # e.g. indigo, marigold — Indian dye palette
+        texture = cust.get("texture")  # e.g. slub, ribbed, handloom
+        pattern = cust.get("pattern")  # e.g. floral, block-print, ikat
 
-        service = OpenAIImageService()
-        descriptor = (
-            f"{attrs.get('color') or ', '.join(attrs.get('colors', []))} "
-            f"{attrs.get('pattern') or ''} {attrs.get('fabric_type', 'fabric')}"
+        service = get_image_service()
+        descriptor = " ".join(
+            p for p in [
+                dye or attrs.get("color") or ", ".join(attrs.get("colors", [])),
+                pattern or attrs.get("pattern") or "",
+                texture or "",
+                attrs.get("fabric_type", "fabric"),
+                f"with a {finish} finish" if finish and finish != "original" else "",
+            ] if p
         ).strip()
 
         # Prefer EDITING the seller's real photo so the true fabric colour/texture
@@ -141,8 +147,6 @@ def image_node(state: PipelineState) -> PipelineState:
         base_bytes = None
         if raws:
             try:
-                import io
-
                 from PIL import Image as PILImage
 
                 im = PILImage.open(io.BytesIO(storage.load(raws[0].storage_key))).convert("RGB")
@@ -152,17 +156,37 @@ def image_node(state: PipelineState) -> PipelineState:
             except Exception as exc:  # noqa: BLE001
                 logger.warning("could not load raw for edit: %s", exc)
 
+        # Generate the shots concurrently — each provider call is a network-bound
+        # 2-30s round trip, so parallelising is the single biggest speed win.
+        started = time.monotonic()
+
+        def _one(shot: str) -> tuple[str, bytes]:
+            prompt = build_prompt(descriptor, shot, custom_prompt, has_reference=base_bytes is not None)
+            aspect = aspect_for(shot)
+            if base_bytes is not None:
+                return shot, service.edit(base_bytes, prompt, aspect=aspect)
+            return shot, service.generate(prompt, aspect=aspect)
+
+        results: list[tuple[str, bytes]] = []
+        errors: list[str] = []
+        workers = max(1, min(settings.image_concurrency, len(shots)))
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {pool.submit(_one, s): s for s in shots}
+            for fut in as_completed(futures):
+                try:
+                    results.append(fut.result())
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("image generation failed for %s: %s", futures[fut], exc)
+                    errors.append(futures[fut])
+
+        # Persist on the main thread (SQLAlchemy sessions aren't thread-safe),
+        # preserving the seller's requested shot order.
+        by_shot = {shot: png for shot, png in results}
         image_ids: list[str] = []
         for shot in shots:
-            scene = SHOT_PROMPTS.get(shot, SHOT_PROMPTS["flatlay"])
-            if base_bytes is not None:
-                prompt = (
-                    f"Restage this exact {descriptor} as a professional e-commerce "
-                    f"product photo: {scene}."
-                )
-                png = service.edit(base_bytes, prompt)
-            else:
-                png = service.generate(f"Product photo of {descriptor}: {scene}.")
+            png = by_shot.get(shot)
+            if png is None:
+                continue
             key = f"submissions/{sid}/gen_{shot}.png"
             storage.save(key, png, "image/png")
             img = Image(
@@ -175,10 +199,20 @@ def image_node(state: PipelineState) -> PipelineState:
             db.add(img)
             db.flush()
             image_ids.append(img.id)
+
+        if not image_ids:
+            raise RuntimeError(errors and f"all image generations failed ({', '.join(errors)})" or "no images generated")
+
+        # Charge image generation to the token budget so usage reflects real spend.
+        add_usage(db, run, 0, len(image_ids) * settings.image_token_cost)
         db.commit()
 
+        elapsed = time.monotonic() - started
         mode = "dry-run" if settings.dry_run_images else ("edited" if base_bytes else "generated")
-        finish_stage(db, run, "enhancing", f"{len(image_ids)} images ({mode})")
+        detail = f"{len(image_ids)} images ({mode}) in {elapsed:.0f}s"
+        if errors:
+            detail += f" · {len(errors)} failed"
+        finish_stage(db, run, "enhancing", detail)
         return {"generated_image_ids": image_ids}
 
 
@@ -196,6 +230,8 @@ def listing_node(state: PipelineState) -> PipelineState:
         tone = cust.get("tone", "editorial")
         audience = cust.get("audience", "designers")
         length = cust.get("length", "standard")
+        custom_prompt = (cust.get("custom_prompt") or "").strip()
+        seller_note = f" Seller's specific request: {custom_prompt}." if custom_prompt else ""
 
         llm = get_chat_llm(0.5).with_structured_output(ProductListing, include_raw=True)
         result = llm.invoke(
@@ -207,7 +243,7 @@ def listing_node(state: PipelineState) -> PipelineState:
                 HumanMessage(
                     f"Fabric profile: {attrs}. "
                     f"Write the listing in a {tone} tone for an audience of {audience}. "
-                    f"Description length: {length}. Include care guidance if relevant."
+                    f"Description length: {length}. Include care guidance if relevant.{seller_note}"
                 ),
             ]
         )
@@ -266,7 +302,9 @@ def publisher_node(state: PipelineState) -> PipelineState:
         sub = db.get(Submission, sid)
         product = db.scalar(select(Product).where(Product.submission_id == sid))
 
-        connected = bool(settings.shopify_store_domain and settings.shopify_admin_token)
+        from app.services.shopify import creds_for_seller
+
+        connected = creds_for_seller(db, sub.seller_id).configured
         if connected:
             # Real Shopify publishing is wired in the Shopify-integration slice.
             # Until the store handshake is confirmed, stage as DRAFT locally.

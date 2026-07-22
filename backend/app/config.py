@@ -62,10 +62,6 @@ class Settings(BaseSettings):
     # Database
     database_url: str = f"sqlite:///{BASE_DIR / 'vastra.db'}"
 
-    # Cache: Redis if REDIS_URL is set (e.g. redis://localhost:6379/0),
-    # else a small in-process TTL cache. Speeds up slow/repeated reads.
-    redis_url: str = ""
-
     # Object storage: "local" for dev, "s3" for AWS S3 (or R2) in prod
     storage_backend: str = "local"
     storage_local_dir: Path = BASE_DIR / "storage"

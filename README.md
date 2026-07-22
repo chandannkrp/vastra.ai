@@ -64,15 +64,15 @@ dev, no redirect URL). Credentials are verified live before they're saved.
 
 ## Performance
 
-- `REDIS_URL` enables Redis caching (falls back to an in-process TTL cache when
-  unset) for slow/repeated reads such as Shopify collections.
+- Slow/repeated reads such as Shopify collections use a small in-process TTL
+  cache (`app/services/cache.py`).
 - Thumbnails lazy-load behind shimmering skeletons; image generation runs the
   requested shots concurrently.
 
 ## Deployment
 
-Each service ships a Dockerfile; `docker-compose.yml` wires them together with
-Redis.
+Each service ships a Dockerfile; `docker-compose.yml` wires backend + ai-service
+together.
 
 ```bash
 # from the repo root, with a populated .env

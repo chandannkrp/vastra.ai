@@ -139,8 +139,9 @@ Human-in-the-loop review sits before anything goes live.
   `DRY_RUN_IMAGES` flag that returns a local placeholder (zero API spend) so
   UI/agent flows can be exercised free. Claude prompt caching + `effort:"low"`
   for cheap steps. Token/image usage logged per run.
-- **Async processing:** `enqueue()` over BackgroundTasks now; swappable to
-  arq/Redis without touching agent code.
+- **Async processing:** `enqueue()` over BackgroundTasks; swappable to a
+  dedicated queue later without touching agent code. No Redis in the stack —
+  caching (`app/services/cache.py`) is an in-process TTL dict.
 - **Idempotency:** publisher keys on the Shopify product GID.
 - **Auditability:** every stage writes to `pipeline_runs.stage_log`.
 
@@ -157,12 +158,12 @@ capabilities to external agents.
 
 | | Dev | Prod (target) |
 |---|---|---|
-| DB | SQLite file | Postgres |
-| Storage | local `./storage` | Cloudflare R2 |
-| Queue | BackgroundTasks | arq + Redis |
+| DB | SQLite file | Postgres (Neon) |
+| Storage | local `./storage` | AWS S3 |
+| Queue | BackgroundTasks | BackgroundTasks (single instance) |
 | Images | dry-run placeholder / `gpt-image-1` low | `gpt-image-1` |
-| Backend | `uvicorn --reload` | container (Railway / Fly) |
-| Frontend | Vite dev server | static host (Vercel / Netlify) |
+| Backend + ai-service | `uvicorn --reload` | containers on a single EC2 instance (Docker Hub images, GitHub Actions CI/CD) |
+| Frontend | Vite dev server | Vercel |
 
 ## 10. Status & roadmap
 

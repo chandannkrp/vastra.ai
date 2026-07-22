@@ -1,0 +1,42 @@
+# Production compose for the EC2 host — backend + ai-service + Caddy (TLS
+# reverse proxy). Frontend is deployed separately on Vercel and isn't here.
+#
+# Images are prebuilt and pushed to Docker Hub by CI (.github/workflows/deploy.yml).
+# This file only pulls and runs them — no build context needed on the server.
+#
+# Replace <dockerhub-username> below with your actual Docker Hub username.
+#
+#   docker compose -f deploy/docker-compose.prod.yml pull
+#   docker compose -f deploy/docker-compose.prod.yml up -d
+services:
+  backend:
+    image: chandannn/vastraas-backend:latest
+    env_file: ../.env
+    environment:
+      AI_SERVICE_URL: http://ai-service:8100
+      PORT: 8000
+    restart: unless-stopped
+
+  ai-service:
+    image: chandannn/vastraas-ai-service:latest
+    env_file: ../.env
+    environment:
+      PORT: 8100
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+
+volumes:
+  caddy_data:
+  caddy_config:

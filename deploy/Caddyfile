@@ -1,0 +1,6 @@
+# Replace with your real API domain. Caddy handles Let's Encrypt TLS
+# automatically — just make sure the domain's DNS A record points at this
+# instance's Elastic IP before starting the caddy container.
+api-vastraas.chandannpandey.in {
+	reverse_proxy backend:8000
+}

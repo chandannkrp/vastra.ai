@@ -30,11 +30,12 @@ export function LogoMark({ size = 32 }: { size?: number }) {
   );
 }
 
-export function Logo({ to = "/" }: { to?: string }) {
+export function Logo({ to = "/", dark = false }: { to?: string; dark?: boolean }) {
+  const textColor = dark ? "text-ink" : "text-white";
   return (
     <Link to={to} className="flex items-center gap-2.5">
       <LogoMark size={34} />
-      <span className="font-display text-2xl font-semibold tracking-tight text-ink">
+      <span className={`font-display text-2xl font-semibold tracking-tight ${textColor}`}>
         vastraas
         <span className="text-saffron-500">.ai</span>
       </span>

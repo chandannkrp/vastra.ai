@@ -1,12 +1,10 @@
 # Python
 backend/.venv/
-ai-service/.venv/
 __pycache__/
 *.pyc
 *.egg-info/
 backend/vastra.db
 backend/storage/
-ai-service/storage/
 
 # Node
 frontend/node_modules/
@@ -15,9 +13,11 @@ frontend/dist/
 # Logs
 *.log
 
-# Env / secrets
+# Env / secrets — ignore all real env files, keep only the .example templates
 .env
-.env.local
+.env.*
+!.env.example
+!frontend/.env.example
 
 # OS / editor
 .DS_Store

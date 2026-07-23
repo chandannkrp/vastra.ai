@@ -1,4 +1,4 @@
-name: Deploy backend + ai-service
+name: Deploy backend
 
 on:
   push:
@@ -30,18 +30,6 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/vastraas-backend:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/vastraas-backend:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build & push ai-service
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ai-service/Dockerfile
-          push: true
-          tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/vastraas-ai-service:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/vastraas-ai-service:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

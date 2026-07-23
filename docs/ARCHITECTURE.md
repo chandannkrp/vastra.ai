@@ -54,6 +54,7 @@ Shopify Admin API integration (the main goal).
 | `app/api/deps.py` | Shared deps: current user, `require_admin` role guard |
 | `app/api/auth.py` | Auth routes: register, login, `/me` |
 | `app/agents/` | LangGraph graph + agent nodes (intake, image, listing, marketing, publisher) |
+| `app/agents/trigger.py` | Enqueues a pipeline run in-process via `BackgroundTasks` |
 | `app/services/openai_images.py` | OpenAI `gpt-image-1` generate/edit (dev cost caps + dry-run) |
 | `app/services/shopify.py` | Shopify Admin **GraphQL** client |
 | `app/services/storage.py` | Object storage: local dir (dev) / S3-R2 (prod) |
@@ -76,7 +77,7 @@ Shopify Admin API integration (the main goal).
   reasoning.
 - **OpenAI** (`gpt-image-1`) — clean/relight + **generate** product imagery.
 - **Shopify Admin GraphQL API** — product create/update, media, metafields.
-- **Object storage** — Cloudflare R2 (S3-compatible) in prod.
+- **Object storage** — AWS S3 in prod.
 
 ## 4. Authentication
 
@@ -162,7 +163,7 @@ capabilities to external agents.
 | Storage | local `./storage` | AWS S3 |
 | Queue | BackgroundTasks | BackgroundTasks (single instance) |
 | Images | dry-run placeholder / `gpt-image-1` low | `gpt-image-1` |
-| Backend + ai-service | `uvicorn --reload` | containers on a single EC2 instance (Docker Hub images, GitHub Actions CI/CD) |
+| Backend | `uvicorn --reload` | single container on EC2 (Docker Hub image, GitHub Actions CI/CD) |
 | Frontend | Vite dev server | Vercel |
 
 ## 10. Status & roadmap

@@ -9,12 +9,12 @@ Built for the Indian clothing market (designers & garmenters). Monorepo.
 
 ## Structure
 
-- `backend/` — FastAPI API + auth, Shopify, tokens/billing, storage (Python 3.13, `uv`)
-- `ai-service/` — LangGraph agent pipeline runner; reuses the `backend` app package
+- `backend/` — FastAPI API + auth, Shopify, tokens/billing, storage, and the
+  LangGraph agent pipeline (Python 3.13, `uv`)
 - `frontend/` — React 19 + TypeScript + Tailwind v4 (Vite) — landing, auth, dashboards
 
-The backend delegates pipeline runs to `ai-service` over HTTP when `AI_SERVICE_URL`
-is set; otherwise it runs the pipeline in-process.
+The backend runs the agent pipeline in-process via `BackgroundTasks`
+(`app/agents/trigger.py`).
 
 ## Providers (swappable)
 
@@ -39,14 +39,11 @@ paid API in dev. Set `DRY_RUN_IMAGES=false` and configure a provider to generate
 for real. Publishing to Shopify requires `STORAGE_BACKEND=s3` (Shopify fetches
 images via presigned URLs).
 
-### Run locally (three services)
+### Run locally (two services)
 
 ```bash
 # backend  → http://localhost:8000  (/health, /docs)
 cd backend && uv run uvicorn app.main:app --reload
-
-# ai-service → http://localhost:8100  (set AI_SERVICE_URL=http://localhost:8100 in .env)
-cd ai-service && uv run uvicorn service.main:app --port 8100 --reload
 
 # frontend → http://localhost:5173
 cd frontend && npm install && npm run dev
@@ -71,8 +68,10 @@ dev, no redirect URL). Credentials are verified live before they're saved.
 
 ## Deployment
 
-Each service ships a Dockerfile; `docker-compose.yml` wires backend + ai-service
-together.
+Each service ships a Dockerfile; `docker-compose.yml` wires backend + frontend
+together for local use. In production, the frontend deploys separately on
+Vercel, and `deploy/docker-compose.prod.yml` runs the backend (behind Caddy for
+TLS) as a single container on EC2 — see `.github/workflows/deploy.yml` for CI/CD.
 
 ```bash
 # from the repo root, with a populated .env
@@ -81,8 +80,6 @@ docker compose up --build
 ```
 
 - Build the frontend with your API URL: `VITE_API_BASE=https://api.example.com`.
-- The ai-service image must be built with the **repo root** as context (it bundles
-  the editable `backend` package) — compose already does this.
 - CORS origins are configurable via `CORS_ORIGINS` (comma-separated) or
   `CORS_ORIGIN_REGEX`.
 

@@ -146,7 +146,7 @@ def create_submission(
     db.commit()
     db.refresh(submission)
 
-    # Kick off the agent pipeline (via the ai-service if configured).
+    # Kick off the agent pipeline.
     trigger_pipeline(background, submission.id)
 
     return SubmissionOut.model_validate(submission)

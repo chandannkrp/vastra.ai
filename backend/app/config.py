@@ -25,10 +25,6 @@ class Settings(BaseSettings):
         raw = self.cors_origins or self.frontend_origin
         return [o.strip() for o in raw.split(",") if o.strip()]
 
-    # AI service (agent pipeline). If set, the backend delegates pipeline runs
-    # to this separate service over HTTP; if blank, it runs in-process.
-    ai_service_url: str = ""
-
     # Auth / JWT
     secret_key: str = "change-me-in-production"
     jwt_secret: str = ""  # strong signing key (preferred over secret_key)
